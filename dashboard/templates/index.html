@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GetPackets</title>
+<style>
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;
+  --accent:#58a6ff;--green:#3fb950;--yellow:#d29922;--red:#f85149;
+  --purple:#bc8cff;--orange:#f0883e;--teal:#76e3ea;--text:#c9d1d9;--muted:#8b949e;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min-height:100vh}
+
+/* ── Header ── */
+header{background:var(--surface);border-bottom:1px solid var(--border);
+  padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  position:sticky;top:0;z-index:100}
+.logo{font-size:20px;font-weight:900;color:var(--accent)}
+.logo span{color:var(--green)}
+.tagline{font-size:11px;color:var(--muted)}
+.hright{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* Status pill */
+.pill{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+  padding:5px 12px;border-radius:20px}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.pill-idle{background:#0d1f0d;color:var(--green)}.pill-idle .dot{background:var(--green)}
+.pill-running{background:#1f1800;color:var(--yellow)}.pill-running .dot{background:var(--yellow);animation:blink 1s infinite}
+.pill-done{background:#0d1526;color:var(--accent)}.pill-done .dot{background:var(--accent)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
+#sbtn{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:700;border:none;cursor:pointer;min-width:110px}
+#sbtn.idle{background:var(--green);color:#000}
+#sbtn.running{background:var(--red);color:#fff}
+.log-toggle{font-size:11px;color:var(--accent);cursor:pointer;text-decoration:underline;display:none}
+
+/* ── Stats ── */
+.stats{background:var(--surface2);border-bottom:1px solid var(--border);
+  display:flex;flex-wrap:wrap;overflow-x:auto}
+.stat{display:flex;flex-direction:column;align-items:center;padding:8px 16px;
+  border-right:1px solid var(--border);min-width:80px}
+.stat:last-child{border-right:none}
+.sv{font-size:20px;font-weight:800}
+.sl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:center}
+
+/* ── Log ── */
+#logpanel{background:#010409;border-bottom:1px solid var(--border);overflow:hidden;max-height:0;transition:max-height .35s}
+#logpanel.open{max-height:180px}
+#loginner{padding:8px 20px;height:160px;overflow-y:auto;font-family:monospace;font-size:11px;line-height:1.8}
+.ll{color:var(--muted)}.ll.ok{color:var(--green)}.ll.warn{color:var(--yellow)}
+.ll.err{color:var(--red)}.ll.head{color:var(--accent);font-weight:700}
+.ll.link{color:var(--purple)}.ll.sep{color:#333}
+
+/* ── Tabs ── */
+.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);
+  padding:0 20px;overflow-x:auto;gap:0}
+.tab{padding:10px 16px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;
+  border-bottom:2px solid transparent;color:var(--muted);transition:.15s;
+  display:flex;align-items:center;gap:6px;flex-shrink:0}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tc{background:var(--surface2);border:1px solid var(--border);font-size:10px;
+  padding:1px 5px;border-radius:8px;min-width:18px;text-align:center}
+.tab.active .tc{background:var(--accent);border-color:var(--accent);color:#000}
+
+/* ── Bulk bar ── */
+.bulk-bar{display:none;position:sticky;top:57px;z-index:99;
+  background:#0d1f0d;border-bottom:2px solid var(--green);border-top:2px solid var(--green);
+  padding:10px 20px;align-items:center;gap:10px;flex-wrap:wrap;
+  box-shadow:0 4px 20px rgba(63,185,80,.2)}
+.bulk-bar.visible{display:flex}
+.bulk-info{font-size:13px;font-weight:800;color:var(--green)}
+
+/* ── Controls ── */
+.controls{padding:8px 20px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+  background:var(--surface);border-bottom:1px solid var(--border)}
+input[type=text],select,input[type=date],input[type=number]{
+  background:var(--bg);border:1px solid var(--border);color:var(--text);
+  padding:6px 10px;border-radius:7px;font-size:12px;outline:none}
+input[type=text]{width:160px}
+input[type=text]:focus,select:focus,input[type=date]:focus{border-color:var(--accent)}
+.btn{padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;border:none;
+  cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px;transition:opacity .15s}
+.btn:hover{opacity:.85}
+.btn-primary{background:var(--accent);color:#000}
+.btn-secondary{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.btn-green{background:var(--green);color:#000}
+.btn-purple{background:var(--purple);color:#000}
+.btn-red{background:var(--red);color:#fff}
+.btn-orange{background:var(--orange);color:#000}
+.btn-teal{background:var(--teal);color:#000}
+.btn-sm{padding:4px 8px;font-size:11px}
+.vbtns{display:flex;gap:3px}
+.vbtns button{background:var(--surface2);border:1px solid var(--border);
+  color:var(--muted);padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12px}
+.vbtns button.active{background:var(--accent);border-color:var(--accent);color:#000}
+.ctrl-sep{width:1px;height:24px;background:var(--border);margin:0 4px}
+
+/* ── PDF search bar ── */
+.pdf-search-bar{padding:6px 20px;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pdf-search-bar label{font-size:11px;color:var(--muted);font-weight:700}
+.relevance-badge{font-size:10px;padding:2px 6px;border-radius:8px;font-weight:700}
+.rel-high{background:#0d2116;color:var(--green)}
+.rel-med{background:#1f1800;color:var(--yellow)}
+.rel-low{background:var(--surface2);color:var(--muted)}
+
+/* ── Cards ── */
+main{padding:16px 20px}
+.count-bar{font-size:12px;color:var(--muted);margin-bottom:12px;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.card-grid{display:none}
+.card-grid.active{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:14px;display:flex;flex-direction:column;gap:8px;
+  transition:.15s;position:relative;cursor:default}
+.card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.card.selected{border-color:var(--accent);background:#0d1a2a;box-shadow:0 0 0 2px var(--accent)}
+
+/* NEW badge */
+.new-badge{position:absolute;top:-8px;right:10px;background:var(--green);
+  color:#000;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;
+  box-shadow:0 0 8px rgba(63,185,80,.5)}
+
+/* Score badge */
+.score-badge{position:absolute;top:-8px;left:10px;font-size:9px;font-weight:800;
+  padding:2px 7px;border-radius:10px}
+
+/* Dismiss button */
+.card-dismiss{position:absolute;top:6px;right:6px;background:rgba(248,81,73,.15);
+  border:1px solid var(--red);color:var(--red);border-radius:5px;
+  width:20px;height:20px;font-size:12px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .15s;z-index:5}
+.card:hover .card-dismiss{opacity:1}
+
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.card-name{font-size:13px;font-weight:700;line-height:1.3}
+.platform-tag{font-size:9px;color:var(--muted);background:var(--surface2);
+  padding:1px 5px;border-radius:4px;display:inline-block;margin-top:2px}
+.badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;white-space:nowrap;flex-shrink:0}
+.b-city_council{background:#0d2137;color:#58a6ff}
+.b-planning_zoning{background:#0d2116;color:#3fb950}
+.b-historic_commission{background:#1f0f2e;color:#bc8cff}
+.b-board_of_adjustments{background:#1f1800;color:#d29922}
+.b-board_of_appeals{background:#200d0d;color:#f85149}
+.b-building_regulations{background:#1a0f00;color:#f0883e}
+.b-environmental_board{background:#0a1f0a;color:#56d364}
+.b-subdivision_platting{background:#0d1a2e;color:#79c0ff}
+.b-redevelopment{background:#1f0d1f;color:#d2a8ff}
+.b-transportation{background:#0f1a1f;color:#76e3ea}
+.b-advisory_board{background:#1f1a0d;color:#e3b341}
+.b-link{background:#1a1040;color:#bc8cff}
+
+.card-meta{font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+.card-tags{display:flex;gap:4px;flex-wrap:wrap}
+.tag{font-size:10px;background:var(--surface2);border:1px solid var(--border);
+  padding:1px 6px;border-radius:10px;color:var(--muted);cursor:pointer}
+.tag:hover{border-color:var(--accent);color:var(--accent)}
+.card-note{font-size:10px;color:var(--yellow);font-style:italic;margin-top:2px}
+.card-foot{margin-top:auto;display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+
+/* ── Table ── */
+.list-view{display:none}.list-view.active{display:block}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:8px 10px;font-size:9px;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border);
+  position:sticky;top:108px;background:var(--bg);cursor:pointer}
+th:hover{color:var(--accent)}
+td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:hover td{background:var(--surface)}
+.new-dot{display:inline-block;width:7px;height:7px;background:var(--green);
+  border-radius:50%;margin-right:4px;box-shadow:0 0 4px var(--green)}
+
+/* ── Pagination ── */
+.pagination{display:flex;align-items:center;gap:6px;justify-content:center;
+  padding:20px 0;flex-wrap:wrap}
+.page-btn{padding:6px 12px;border-radius:7px;border:1px solid var(--border);
+  background:var(--surface2);color:var(--muted);cursor:pointer;font-size:12px;text-decoration:none}
+.page-btn:hover{border-color:var(--accent);color:var(--accent)}
+.page-btn.active{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700}
+.page-btn.disabled{opacity:.3;cursor:not-allowed;pointer-events:none}
+.page-info{font-size:12px;color:var(--muted)}
+
+/* ── Keyword manager ── */
+.keyword-section{background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:16px;margin-bottom:16px}
+.keyword-section h3{font-size:13px;font-weight:700;margin-bottom:12px;color:var(--accent)}
+.keyword-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.kw-tag{display:flex;align-items:center;gap:4px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px}
+.kw-tag.planning{border-color:var(--green);color:var(--green)}
+.kw-tag.building{border-color:var(--orange);color:var(--orange)}
+.kw-tag.custom{border-color:var(--purple);color:var(--purple)}
+.kw-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;
+  padding:0 2px;line-height:1}
+.kw-del:hover{color:var(--red)}
+.kw-add{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+
+/* ── Modal ── */
+#mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;
+  align-items:center;justify-content:center}
+.mbox{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:20px;max-width:520px;width:90%;max-height:85vh;overflow-y:auto}
+.mhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.mcls{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer}
+
+/* ── Confirm ── */
+#confirm-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);
+  z-index:300;align-items:center;justify-content:center}
+.confirm-box{background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:22px;max-width:360px;width:90%}
+.confirm-box h3{margin-bottom:8px;font-size:14px}
+.confirm-box p{font-size:12px;color:var(--muted);margin-bottom:16px}
+.confirm-btns{display:flex;gap:8px;justify-content:flex-end}
+
+/* ── Delete options ── */
+#delete-options-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);
+  z-index:400;align-items:center;justify-content:center}
+
+/* ── Delete all ── */
+#delete-all-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);
+  z-index:400;align-items:center;justify-content:center}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:20px;right:20px;padding:10px 18px;border-radius:10px;
+  font-size:13px;font-weight:700;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
+#toast.show{opacity:1}
+#toast.green{background:var(--green);color:#000}
+#toast.orange{background:var(--orange);color:#000}
+#toast.red{background:var(--red);color:#fff}
+#toast.blue{background:var(--accent);color:#000}
+
+/* ── Empty ── */
+.empty{text-align:center;padding:50px 20px;color:var(--muted);grid-column:1/-1}
+.empty h2{font-size:16px;margin-bottom:8px;color:var(--text)}
+.empty button{background:var(--green);color:#000;border:none;
+  padding:8px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-top:12px}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div>
+    <div class="logo">Get<span>Packets</span></div>
+    <div class="tagline">US Government Agenda Packets · Legistar · CivicPlus · PrimeGov · Municode · Novus</div>
+  </div>
+  <div class="hright">
+    <span class="pill pill-idle" id="pill"><span class="dot"></span><span id="ptxt">Idle</span></span>
+    <span class="log-toggle" id="ltog" onclick="toggleLog()">Show log ▾</span>
+    <button id="sbtn" class="idle" onclick="toggleScraper()">▶ Start</button>
+  </div>
+</header>
+
+<!-- Stats -->
+<div class="stats">
+  <div class="stat"><div class="sv" style="color:var(--green)" id="s-packets">{{ stats.total_packets }}</div><div class="sl">Active</div></div>
+  {% if stats.new_packets > 0 %}<div class="stat"><div class="sv" style="color:var(--yellow)">{{ stats.new_packets }}</div><div class="sl">New 48h</div></div>{% endif %}
+  <div class="stat"><div class="sv" style="color:var(--orange)" id="s-archived">{{ stats.archived_packets }}</div><div class="sl">Archived</div></div>
+  <div class="stat"><div class="sv" style="color:var(--purple)" id="s-links">{{ stats.total_links }}</div><div class="sl">Links</div></div>
+  <div class="stat"><div class="sv" id="s-states">{{ stats.states_covered }}</div><div class="sl">States</div></div>
+  {% for item in stats.body_breakdown %}
+  <div class="stat">
+    <div class="sv" style="font-size:15px;color:var(--accent)">{{ item.cnt }}</div>
+    <div class="sl">{{ item.body_type.replace('_',' ').title()[:12] }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Log -->
+<div id="logpanel"><div id="loginner"></div></div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <div class="tab {% if tab=='packets' %}active{% endif %}" onclick="switchTab('packets')" id="tab-packets">
+    📄 Packets <span class="tc" id="tc-packets">{{ total_meetings }}</span>
+  </div>
+  <div class="tab {% if tab=='links' %}active{% endif %}" onclick="switchTab('links')" id="tab-links">
+    🔗 Links <span class="tc">{{ links|length }}</span>
+  </div>
+  <div class="tab {% if tab=='archive' %}active{% endif %}" onclick="switchTab('archive')" id="tab-archive">
+    🗄 Archived <span class="tc">{{ stats.archived_packets }}</span>
+  </div>
+  <div class="tab {% if tab=='recycle' %}active{% endif %}" onclick="switchTab('recycle')" id="tab-recycle">
+    ♻ Recycle <span class="tc" style="{% if recycle|length > 0 %}background:var(--orange);color:#000{% endif %}">{{ recycle|length }}</span>
+  </div>
+  <div class="tab {% if tab=='failed' %}active{% endif %}" onclick="switchTab('failed')" id="tab-failed">
+    ⚠ Failed <span class="tc">{{ failed|length }}</span>
+  </div>
+  <div class="tab {% if tab=='sessions' %}active{% endif %}" onclick="switchTab('sessions')" id="tab-sessions">
+    🕐 Sessions <span class="tc">{{ sessions|length }}</span>
+  </div>
+  <div class="tab {% if tab=='keywords' %}active{% endif %}" onclick="switchTab('keywords')" id="tab-keywords">
+    🔑 Keywords <span class="tc">{{ user_keywords|length }}</span>
+  </div>
+</div>
+
+<!-- Bulk bar -->
+<div class="bulk-bar" id="bulk-bar">
+  <span class="bulk-info">✔ <span id="sel-count">0</span> selected</span>
+  <button class="btn btn-secondary btn-sm" onclick="selectAll()">☑ All</button>
+  <button class="btn btn-secondary btn-sm" onclick="selectNone()">☐ None</button>
+  <div class="ctrl-sep"></div>
+  <button class="btn btn-primary btn-sm" onclick="openSelectedPdfs()">👁 View</button>
+  <button class="btn btn-orange btn-sm" onclick="bulkArchive()">🗄 Archive</button>
+  <button class="btn btn-red btn-sm" onclick="bulkDelete()">🗑 Delete</button>
+</div>
+
+<!-- Controls -->
+<form method="get" action="/" id="filterform">
+<input type="hidden" name="tab" id="tab-input" value="{{ tab }}">
+<input type="hidden" name="archived" id="archived-input" value="{{ '1' if show_archive else '0' }}">
+<input type="hidden" name="view" id="view-input" value="{{ view }}">
+<input type="hidden" name="page" id="page-input" value="1">
+<div class="controls">
+  <input type="text" name="q" placeholder="🔍 City, state, body…" value="{{ search }}">
+  <select name="body">
+    <option value="">All types</option>
+    <option value="city_council" {% if body_filter=='city_council' %}selected{% endif %}>🏛 City Council</option>
+    <option value="planning_zoning" {% if body_filter=='planning_zoning' %}selected{% endif %}>📐 Planning & Zoning</option>
+    <option value="board_of_adjustments" {% if body_filter=='board_of_adjustments' %}selected{% endif %}>⚖ Board of Adjustments</option>
+    <option value="board_of_appeals" {% if body_filter=='board_of_appeals' %}selected{% endif %}>📋 Board of Appeals</option>
+    <option value="building_regulations" {% if body_filter=='building_regulations' %}selected{% endif %}>🏗 Building</option>
+    <option value="historic_commission" {% if body_filter=='historic_commission' %}selected{% endif %}>🏰 Historic</option>
+    <option value="environmental_board" {% if body_filter=='environmental_board' %}selected{% endif %}>🌿 Environmental</option>
+    <option value="subdivision_platting" {% if body_filter=='subdivision_platting' %}selected{% endif %}>🗺 Subdivision</option>
+    <option value="redevelopment" {% if body_filter=='redevelopment' %}selected{% endif %}>🏘 Redevelopment</option>
+    <option value="transportation" {% if body_filter=='transportation' %}selected{% endif %}>🚗 Transportation</option>
+    <option value="advisory_board" {% if body_filter=='advisory_board' %}selected{% endif %}>💡 Advisory</option>
+  </select>
+  <select name="state">
+    <option value="">All states</option>
+    {% for s in (stats.distinct_states + stats.link_states)|unique|sort %}
+    <option value="{{ s }}" {% if state_filter==s %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <input type="date" name="date_from" value="{{ date_from }}" title="From date">
+  <input type="date" name="date_to" value="{{ date_to }}" title="To date">
+  <select name="sort" id="sort-select">
+    <option value="newest" {% if sort_by=='newest' %}selected{% endif %}>Newest first</option>
+    <option value="oldest" {% if sort_by=='oldest' %}selected{% endif %}>Oldest first</option>
+    <option value="date_asc" {% if sort_by=='date_asc' %}selected{% endif %}>Meeting date ↑</option>
+    <option value="date_desc" {% if sort_by=='date_desc' %}selected{% endif %}>Meeting date ↓</option>
+    <option value="state" {% if sort_by=='state' %}selected{% endif %}>By state</option>
+    <option value="score" {% if sort_by=='score' %}selected{% endif %}>Relevance score</option>
+  </select>
+  <select name="per_page">
+    <option value="25" {% if per_page==25 %}selected{% endif %}>25 / page</option>
+    <option value="50" {% if per_page==50 %}selected{% endif %}>50 / page</option>
+    <option value="100" {% if per_page==100 %}selected{% endif %}>100 / page</option>
+  </select>
+  <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+  {% if search or body_filter or state_filter or date_from or date_to %}
+  <a href="/" class="btn btn-secondary btn-sm">✕ Clear</a>
+  {% endif %}
+  <div class="ctrl-sep"></div>
+  <div class="vbtns">
+    <button type="button" class="{% if view=='card' %}active{% endif %}" onclick="setView('card')" title="Card view">⊞</button>
+    <button type="button" class="{% if view=='list' %}active{% endif %}" onclick="setView('list')" title="List view">☰</button>
+  </div>
+  <div class="ctrl-sep"></div>
+  <button type="button" class="btn btn-red btn-sm" onclick="showDeleteOptions()">🗑 Delete</button>
+  <div class="ctrl-sep"></div>
+  <a href="/api/export/csv" class="btn btn-teal btn-sm">⬇ CSV</a>
+  <a href="/api/export/json" class="btn btn-secondary btn-sm">⬇ JSON</a>
+  <button type="button" class="btn btn-secondary btn-sm" onclick="scoreAllPackets()" title="Score packets by relevance">⭐ Score</button>
+</div>
+</form>
+
+<!-- PDF search -->
+<div class="pdf-search-bar">
+  <label>🔍 INSIDE PDFs:</label>
+  <input type="text" id="pdf-q" placeholder="rezoning, variance, plat…" value="{{ pdf_query }}"
+    style="width:220px" onkeydown="if(event.key==='Enter')runPdfSearch()">
+  <button class="btn btn-primary btn-sm" onclick="runPdfSearch()">Search</button>
+  <button class="btn btn-secondary btn-sm" onclick="indexPdfs()">⚙ Index</button>
+  <span id="pdf-result" style="font-size:11px;color:var(--muted)"></span>
+</div>
+
+<main>
+
+<!-- ── PACKETS TAB ── -->
+<div id="pane-packets" {% if tab!='packets' %}style="display:none"{% endif %}>
+  <div class="count-bar">
+    <strong>{{ total_meetings }}</strong> packet{% if total_meetings!=1 %}s{% endif %}
+    {% if search %} · "<em>{{ search }}</em>"{% endif %}
+    · Page {{ current_page }}/{{ total_pages }}
+    {% if total_meetings > 0 %}
+    <span style="margin-left:auto;font-size:11px;color:var(--muted)">
+      Showing {{ ((current_page-1)*per_page)+1 }}–{{ [current_page*per_page, total_meetings]|min }}
+    </span>
+    {% endif %}
+  </div>
+
+  <!-- Card Grid -->
+  <div class="card-grid {% if view=='card' %}active{% endif %}" id="card-grid">
+    {% if meetings %}
+      {% for m in meetings %}
+      <div class="card" data-mid="{{ m.id }}" id="card-{{ m.id }}">
+        {% if m.is_new %}<div class="new-badge">NEW</div>{% endif %}
+        <button class="card-dismiss" onclick="quickArchive(event,{{ m.id }})" title="Archive">✕</button>
+        <div class="card-top">
+          <div>
+            <div class="card-name">{{ m.municipality }}, {{ m.state }}</div>
+            <span class="platform-tag">{{ m.platform or 'Legistar' }}</span>
+          </div>
+          <span class="badge b-{{ m.body_type }}">
+            {%- if m.body_type=='city_council' %}🏛
+            {%- elif m.body_type=='planning_zoning' %}📐
+            {%- elif m.body_type=='board_of_adjustments' %}⚖
+            {%- elif m.body_type=='board_of_appeals' %}📋
+            {%- elif m.body_type=='building_regulations' %}🏗
+            {%- elif m.body_type=='historic_commission' %}🏰
+            {%- elif m.body_type=='environmental_board' %}🌿
+            {%- elif m.body_type=='subdivision_platting' %}🗺
+            {%- elif m.body_type=='redevelopment' %}🏘
+            {%- elif m.body_type=='transportation' %}🚗
+            {%- elif m.body_type=='advisory_board' %}💡
+            {%- endif %} {{ m.body_type.replace('_',' ').title() }}
+          </span>
+        </div>
+        <div class="card-meta">
+          <span>📅 {{ m.meeting_date }}</span>
+          <span>🏛 {{ m.body_name[:45] }}</span>
+          {% if m.location %}<span>📍 {{ m.location[:40] }}</span>{% endif %}
+        </div>
+        <div class="card-foot">
+          <input type="checkbox" onclick="toggleSelect(event,this)" data-mid="{{ m.id }}"
+            style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);flex-shrink:0">
+          <a href="#" class="btn btn-primary btn-sm" onclick="showPackets(event,{{ m.id }})">📄 Packets</a>
+          {% if m.source_url %}<a href="{{ m.source_url }}" target="_blank" class="btn btn-secondary btn-sm">↗</a>{% endif %}
+          <button class="btn btn-secondary btn-sm" onclick="showNoteTag({{ m.id }})" title="Notes & Tags">🏷</button>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">
+        <h2>No packets yet</h2>
+        <p>Click ▶ Start to begin collecting packets.</p>
+        <button onclick="toggleScraper()">▶ Start Now</button>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- List View -->
+  <div class="list-view {% if view=='list' %}active{% endif %}" id="list-view">
+    {% if meetings %}
+    <table>
+      <thead><tr>
+        <th><input type="checkbox" onclick="toggleAll(this)" style="cursor:pointer"></th>
+        <th>State</th><th>Municipality</th><th>Type</th>
+        <th>Meeting Date</th><th>Platform</th><th>Actions</th>
+      </tr></thead>
+      <tbody>
+        {% for m in meetings %}
+        <tr>
+          <td><input type="checkbox" onclick="toggleSelect(event,this)" data-mid="{{ m.id }}"
+            style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td>
+          <td>{{ m.state }}</td>
+          <td style="font-weight:700">
+            {% if m.is_new %}<span class="new-dot"></span>{% endif %}
+            {{ m.municipality }}
+          </td>
+          <td><span class="badge b-{{ m.body_type }}">{{ m.body_type.replace('_',' ').title() }}</span></td>
+          <td>{{ m.meeting_date }}</td>
+          <td><span class="platform-tag">{{ m.platform or 'Legistar' }}</span></td>
+          <td style="display:flex;gap:4px;flex-wrap:wrap">
+            <a href="#" class="btn btn-primary btn-sm" onclick="showPackets(event,{{ m.id }})">📄</a>
+            {% if m.source_url %}<a href="{{ m.source_url }}" target="_blank" class="btn btn-secondary btn-sm">↗</a>{% endif %}
+            <button class="btn btn-secondary btn-sm" onclick="quickArchive(event,{{ m.id }})">🗄</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div class="empty"><h2>No packets yet</h2><button onclick="toggleScraper()">▶ Start</button></div>
+    {% endif %}
+  </div>
+
+  <!-- Pagination -->
+  {% if total_pages > 1 %}
+  <div class="pagination">
+    {% if current_page > 1 %}
+    <a href="?tab=packets&page={{ current_page-1 }}&q={{ search }}&body={{ body_filter }}&state={{ state_filter }}&view={{ view }}&per_page={{ per_page }}&sort={{ sort_by }}" class="page-btn">← Prev</a>
+    {% endif %}
+    {% for p in range(1, total_pages+1) %}
+      {% if p == current_page %}
+      <span class="page-btn active">{{ p }}</span>
+      {% elif p <= 3 or p >= total_pages-2 or (p >= current_page-2 and p <= current_page+2) %}
+      <a href="?tab=packets&page={{ p }}&q={{ search }}&body={{ body_filter }}&state={{ state_filter }}&view={{ view }}&per_page={{ per_page }}&sort={{ sort_by }}" class="page-btn">{{ p }}</a>
+      {% elif p == 4 or p == total_pages-3 %}
+      <span class="page-info">…</span>
+      {% endif %}
+    {% endfor %}
+    {% if current_page < total_pages %}
+    <a href="?tab=packets&page={{ current_page+1 }}&q={{ search }}&body={{ body_filter }}&state={{ state_filter }}&view={{ view }}&per_page={{ per_page }}&sort={{ sort_by }}" class="page-btn">Next →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── LINKS TAB ── -->
+<div id="pane-links" {% if tab!='links' %}style="display:none"{% endif %}>
+  <div class="count-bar"><strong>{{ links|length }}</strong> meeting page links</div>
+  <div class="card-grid active">
+    {% if links %}
+      {% for lnk in links %}
+      <div class="card">
+        <div class="card-top">
+          <div><div class="card-name">{{ lnk.municipality }}, {{ lnk.state }}</div></div>
+          <span class="badge b-link">🔗 Manual</span>
+        </div>
+        <div class="card-meta"><span style="font-size:10px;word-break:break-all">{{ lnk.meeting_url }}</span></div>
+        <div class="card-foot">
+          <a href="{{ lnk.meeting_url }}" target="_blank" class="btn btn-purple btn-sm">🌐 Visit</a>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty"><h2>No links yet</h2></div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── ARCHIVE TAB ── -->
+<div id="pane-archive" {% if tab!='archive' %}style="display:none"{% endif %}>
+  <div class="count-bar"><strong>{{ stats.archived_packets }}</strong> archived packets</div>
+  <div class="card-grid active">
+    {% if tab=='archive' and meetings %}
+      {% for m in meetings %}
+      <div class="card" style="opacity:.65;border-style:dashed">
+        <div class="card-top">
+          <div><div class="card-name">{{ m.municipality }}, {{ m.state }}</div></div>
+          <span class="badge b-{{ m.body_type }}">{{ m.body_type.replace('_',' ').title() }}</span>
+        </div>
+        <div class="card-meta"><span>📅 {{ m.meeting_date }}</span><span>🏛 {{ m.body_name[:40] }}</span></div>
+        <div class="card-foot">
+          <input type="checkbox" onclick="toggleSelect(event,this)" data-mid="{{ m.id }}"
+            style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
+          <a href="#" class="btn btn-secondary btn-sm" onclick="showPackets(event,{{ m.id }},true)">📄 View</a>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty"><h2>No archived packets</h2></div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── RECYCLE BIN TAB ── -->
+<div id="pane-recycle" {% if tab!='recycle' %}style="display:none"{% endif %}>
+  <div class="count-bar">
+    <strong>{{ recycle|length }}</strong> items in recycle bin — restored within 7 days
+    {% if recycle %}<button class="btn btn-red btn-sm" onclick="emptyRecycle()" style="margin-left:8px">🗑 Empty Bin</button>{% endif %}
+  </div>
+  <div class="card-grid active">
+    {% if recycle %}
+      {% for r in recycle %}
+      <div class="card" style="opacity:.7;border-style:dashed">
+        <div class="card-top">
+          <div><div class="card-name">{{ r.municipality }}, {{ r.state }}</div></div>
+          <span class="badge b-{{ r.body_type }}">{{ r.body_type.replace('_',' ').title() }}</span>
+        </div>
+        <div class="card-meta">
+          <span>📅 {{ r.meeting_date }}</span>
+          <span>🏛 {{ r.body_name[:40] }}</span>
+          <span style="color:var(--orange);font-size:10px">Expires {{ r.expires_at[:10] }}</span>
+        </div>
+        <div class="card-foot">
+          <button class="btn btn-green btn-sm" onclick="restorePacket({{ r.id }})">↩ Restore</button>
+          {% if r.file_url %}<a href="{{ r.file_url }}" target="_blank" class="btn btn-secondary btn-sm">📄 PDF</a>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty"><h2>Recycle bin empty</h2><p>Deleted packets appear here for 7 days.</p></div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── FAILED TAB ── -->
+<div id="pane-failed" {% if tab!='failed' %}style="display:none"{% endif %}>
+  <div class="count-bar"><strong>{{ failed|length }}</strong> failed downloads</div>
+  <div class="card-grid active">
+    {% if failed %}
+      {% for f in failed %}
+      <div class="card">
+        <div class="card-top">
+          <div><div class="card-name">{{ f.municipality }}, {{ f.state }}</div></div>
+          <span class="badge" style="background:#1f1800;color:var(--yellow)">⚠ Failed</span>
+        </div>
+        <div class="card-meta">
+          <span>📅 {{ f.meeting_date }}</span>
+          <span style="color:var(--red);font-size:10px">{{ f.error or 'Download failed' }}</span>
+        </div>
+        <div class="card-foot">
+          {% if f.source_url %}<a href="{{ f.source_url }}" target="_blank" class="btn btn-orange btn-sm">🌐 Visit</a>{% endif %}
+          {% if f.file_url %}<a href="{{ f.file_url }}" target="_blank" class="btn btn-primary btn-sm">📄 Try PDF</a>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty"><h2>No failed downloads</h2></div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── SESSIONS TAB ── -->
+<div id="pane-sessions" {% if tab!='sessions' %}style="display:none"{% endif %}>
+  <div class="count-bar"><strong>{{ sessions|length }}</strong> search sessions</div>
+  {% if sessions %}
+    {% for sess in sessions %}
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;
+                padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700">
+          Session #{{ sess.id }}
+          {% if sess.status=='running' %}<span style="background:#1f1800;color:var(--yellow);font-size:9px;padding:2px 6px;border-radius:8px;margin-left:6px">● RUNNING</span>{% endif %}
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">
+          {{ sess.started_at[:19].replace('T',' ') }}
+          {% if sess.stopped_at %} → {{ sess.stopped_at[:19].replace('T',' ') }}{% endif %}
+        </div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:22px;font-weight:800;color:var(--green)">{{ sess.packets_found }}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase">packets</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="viewSession({{ sess.id }})">View</button>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty"><h2>No sessions yet</h2></div>
+  {% endif %}
+</div>
+
+<!-- ── KEYWORDS TAB ── -->
+<div id="pane-keywords" {% if tab!='keywords' %}style="display:none"{% endif %}>
+  <div class="keyword-section">
+    <h3>🔑 Keyword Manager</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">
+      Keywords are used to score packets by relevance and search inside PDFs.
+      Add your own — packets containing more keywords get higher scores.
+    </p>
+
+    <!-- Add new keyword -->
+    <div class="kw-add" style="margin-bottom:16px;padding:14px;background:var(--surface2);border-radius:8px">
+      <span style="font-size:12px;font-weight:700;color:var(--accent)">Add Keyword:</span>
+      <input type="text" id="new-kw-input" placeholder="e.g. rezone, variance, plat…"
+        style="width:200px" onkeydown="if(event.key==='Enter')addKeyword()">
+      <select id="new-kw-cat" style="width:130px">
+        <option value="custom">Custom</option>
+        <option value="planning">Planning</option>
+        <option value="building">Building</option>
+        <option value="legal">Legal</option>
+      </select>
+      <button class="btn btn-green btn-sm" onclick="addKeyword()">+ Add</button>
+    </div>
+
+    <!-- User keywords -->
+    {% if user_keywords %}
+    <div style="margin-bottom:10px;font-size:11px;color:var(--muted)">Your keywords ({{ user_keywords|length }}):</div>
+    <div class="keyword-grid">
+      {% for kw in user_keywords %}
+      <span class="kw-tag {{ kw.category }}">
+        {{ kw.keyword }}
+        <button class="kw-del" onclick="deleteKeyword({{ kw.id }}, this)" title="Remove">×</button>
+      </span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Built-in keyword preview -->
+    <div style="margin-top:16px;padding:14px;background:var(--surface2);border-radius:8px">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px">BUILT-IN KEYWORDS (always active):</div>
+      <div style="font-size:10px;color:var(--muted);line-height:2">
+        rezoning · rezone · variance · plat · subdivision · conditional use permit ·
+        special use permit · annexation · replat · site plan · board of adjustment ·
+        zoning appeal · historic preservation · design review · building permit ·
+        code enforcement · comprehensive plan · overlay district · easement ·
+        right of way · floodplain · stormwater · lot split · boundary line ·
+        planned unit development · affordable housing · density bonus · mixed use ·
+        and 30+ more…
+      </div>
+    </div>
+
+    <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" onclick="scoreAllPackets()">⭐ Score All Packets Now</button>
+      <button class="btn btn-secondary btn-sm" onclick="indexPdfs()">⚙ Index PDFs for Search</button>
+      <a href="/api/export/csv" class="btn btn-teal btn-sm">⬇ Export CSV</a>
+      <a href="/api/export/json" class="btn btn-secondary btn-sm">⬇ Export JSON</a>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- Packet modal -->
+<div id="mo">
+  <div class="mbox">
+    <div class="mhdr">
+      <h3 id="mo-title" style="font-size:14px">Packets</h3>
+      <button class="mcls" onclick="closeMo()">✕</button>
+    </div>
+    <div id="mbody">Loading…</div>
+  </div>
+</div>
+
+<!-- Confirm delete -->
+<div id="confirm-overlay">
+  <div class="confirm-box">
+    <h3>Move to recycle bin?</h3>
+    <p id="confirm-msg"></p>
+    <div class="confirm-btns">
+      <button class="btn btn-secondary btn-sm" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-red btn-sm" id="confirm-ok-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete options -->
+<div id="delete-options-overlay">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;
+              padding:24px;max-width:440px;width:90%">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <h2 style="font-size:15px">🗑 Delete Packets</h2>
+      <button onclick="closeDeleteOptions()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:18px">
+      Deleted packets go to ♻ Recycle Bin and can be restored within 7 days. They will never be re-downloaded.
+    </p>
+    <div style="background:var(--surface2);border-radius:8px;padding:14px;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px">Delete Oldest N Packets</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--muted)">Delete oldest</span>
+        <input type="number" id="delete-n-input" value="50" min="1" max="1000"
+          style="width:70px;font-size:12px">
+        <span style="font-size:11px;color:var(--muted)">packets</span>
+        <button class="btn btn-orange btn-sm" onclick="deleteOldest()">Delete</button>
+      </div>
+    </div>
+    <div style="background:var(--surface2);border-radius:8px;padding:14px;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:6px">Delete Selected (<span id="del-sel-count">0</span>)</div>
+      <button class="btn btn-orange btn-sm" onclick="closeDeleteOptions();bulkDelete()">Delete Selected</button>
+    </div>
+    <div style="background:#200d0d;border:1px solid var(--red);border-radius:8px;padding:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:6px">⚠ Delete All Packets</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Type DELETE to confirm</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="text" id="delete-confirm-input" placeholder="Type DELETE" style="width:120px;font-size:12px">
+        <button class="btn btn-red btn-sm" onclick="executeDeleteAll()">Delete All</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Note/Tag modal -->
+<div id="note-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:400px;width:90%">
+    <div style="display:flex;justify-content:space-between;margin-bottom:14px">
+      <h3 style="font-size:14px">🏷 Notes & Tags</h3>
+      <button onclick="closeNoteTag()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <input type="hidden" id="note-mid">
+    <div style="margin-bottom:12px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">NOTE:</div>
+      <textarea id="note-text" rows="3" placeholder="Add your notes here…"
+        style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+               padding:8px;border-radius:7px;font-size:12px;resize:vertical"></textarea>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">QUICK TAGS:</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        {% for tag in ['follow up','important','rezoning','variance','plat','client','reviewed','pending'] %}
+        <span class="tag" onclick="toggleTagBtn(this,'{{ tag }}')">{{ tag }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary btn-sm" onclick="closeNoteTag()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveNoteTag()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let running = false, logOpen = false, lastPkts = {{ stats.total_packets }},
+    lastLog = 0, selected = new Set(), pendingDeleteId = null;
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(t) {
+  const directTabs = ['archive','recycle','failed','sessions','keywords'];
+  if (directTabs.includes(t)) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', t);
+    url.searchParams.set('archived', t==='archive'?'1':'0');
+    url.searchParams.set('page','1');
+    window.location.href = url.toString();
+    return;
+  }
+  document.getElementById('tab-input').value = t;
+  document.getElementById('archived-input').value = '0';
+  ['packets','links','archive','recycle','failed','sessions','keywords'].forEach(x => {
+    const pane = document.getElementById('pane-'+x);
+    const tab  = document.getElementById('tab-'+x);
+    if (pane) pane.style.display = t===x ? '' : 'none';
+    if (tab)  tab.classList.toggle('active', t===x);
+  });
+  const bodySelect = document.getElementById('body');
+  if (bodySelect) bodySelect.style.display = t==='packets' ? '' : 'none';
+}
+
+// ── Scraper ───────────────────────────────────────────────────────────────────
+async function toggleScraper() {
+  const btn = document.getElementById('sbtn');
+  btn.disabled = true;
+  const action = running ? 'stop' : 'start';
+  await fetch('/api/scraper/' + action, {method:'POST'});
+  btn.disabled = false;
+  if (action === 'start') { showToast('GetPackets started!', 'green'); openLog(); }
+  else showToast('Scraper stopped.', 'orange');
+  await poll();
+}
+
+async function poll() {
+  try {
+    const d = await fetch('/api/scraper/status').then(r=>r.json());
+    const pill=document.getElementById('pill'), ptxt=document.getElementById('ptxt');
+    const btn=document.getElementById('sbtn'), ltog=document.getElementById('ltog');
+    running = d.running;
+    if (d.running) {
+      pill.className='pill pill-running'; ptxt.textContent='Scraping…';
+      btn.textContent='⏹ Stop'; btn.className='running'; ltog.style.display='inline';
+      if (!logOpen) openLog();
+    } else if (d.status==='finished') {
+      pill.className='pill pill-done'; ptxt.textContent='Finished';
+      btn.textContent='▶ Start'; btn.className='idle'; ltog.style.display='inline';
+    } else {
+      pill.className='pill pill-idle'; ptxt.textContent='Idle';
+      btn.textContent='▶ Start'; btn.className='idle';
+    }
+    if (d.log && d.log.length > lastLog) { renderLog(d.log); lastLog = d.log.length; }
+    const s = await fetch('/api/stats').then(r=>r.json());
+    document.getElementById('s-packets').textContent  = s.total_packets;
+    document.getElementById('s-archived').textContent = s.archived_packets;
+    document.getElementById('s-links').textContent    = s.total_links;
+    document.getElementById('s-states').textContent   = s.states_covered;
+    if (s.total_packets !== lastPkts) {
+      lastPkts = s.total_packets;
+      showToast('✔ ' + s.total_packets + ' packets collected', 'green');
+      if (!running) setTimeout(() => window.location.reload(), 2000);
+    }
+  } catch(e) {}
+}
+
+function renderLog(lines) {
+  const el = document.getElementById('loginner');
+  el.innerHTML = lines.map(l => {
+    let c = 'll';
+    if (l.includes('✔')||l.includes('Downloaded')) c+=' ok';
+    else if (l.includes('⚠')) c+=' warn';
+    else if (l.includes('✘')) c+=' err';
+    else if (l.includes('🔗')) c+=' link';
+    else if (l.includes('▶')||l.includes('STATE')||l.includes('PASS')) c+=' head';
+    else if (l.startsWith('──')) c+=' sep';
+    return `<div class="${c}">${esc(l)}</div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+function openLog(){logOpen=true;document.getElementById('logpanel').classList.add('open');}
+function toggleLog(){logOpen=!logOpen;document.getElementById('logpanel').classList.toggle('open',logOpen);document.getElementById('ltog').textContent=logOpen?'Hide log ▴':'Show log ▾';}
+
+// ── View toggle ───────────────────────────────────────────────────────────────
+function setView(v) {
+  document.getElementById('view-input').value = v;
+  document.getElementById('card-grid').className = 'card-grid ' + (v==='card'?'active':'');
+  document.getElementById('list-view').className = 'list-view ' + (v==='list'?'active':'');
+  document.querySelectorAll('.vbtns button').forEach((b,i) =>
+    b.classList.toggle('active',(i===0&&v==='card')||(i===1&&v==='list')));
+}
+
+// ── Selection ─────────────────────────────────────────────────────────────────
+function toggleSelect(e, cb) {
+  e.stopPropagation();
+  const mid = cb.dataset.mid;
+  const card = document.getElementById('card-'+mid);
+  if (cb.checked) { selected.add(mid); if(card)card.classList.add('selected'); }
+  else            { selected.delete(mid); if(card)card.classList.remove('selected'); }
+  updateBulkBar();
+}
+function toggleAll(masterCb) {
+  document.querySelectorAll('tbody input[type=checkbox]').forEach(cb => {
+    cb.checked = masterCb.checked;
+    const mid = cb.dataset.mid;
+    if (masterCb.checked) selected.add(mid); else selected.delete(mid);
+  });
+  updateBulkBar();
+}
+function selectAll() {
+  document.querySelectorAll('[data-mid]').forEach(el => {
+    if (el.type === 'checkbox') {
+      el.checked = true;
+      selected.add(el.dataset.mid);
+      const card = document.getElementById('card-'+el.dataset.mid);
+      if(card) card.classList.add('selected');
+    }
+  });
+  updateBulkBar();
+}
+function selectNone() {
+  document.querySelectorAll('[data-mid]').forEach(el => {
+    if (el.type === 'checkbox') {
+      el.checked = false;
+      selected.delete(el.dataset.mid);
+      const card = document.getElementById('card-'+el.dataset.mid);
+      if(card) card.classList.remove('selected');
+    }
+  });
+  updateBulkBar();
+}
+function updateBulkBar() {
+  document.getElementById('sel-count').textContent = selected.size;
+  document.getElementById('bulk-bar').classList.toggle('visible', selected.size > 0);
+}
+async function bulkArchive() {
+  if (!selected.size) return;
+  await fetch('/api/packets/bulk-archive', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ids: Array.from(selected)})
+  });
+  showToast(selected.size + ' packets archived', 'orange');
+  setTimeout(() => window.location.reload(), 800);
+}
+async function bulkDelete() {
+  if (!selected.size) return;
+  if (!confirm('Move ' + selected.size + ' packet(s) to recycle bin?')) return;
+  for (const pid of selected) {
+    await fetch('/api/packet/'+pid+'/delete', {method:'POST'});
+  }
+  showToast(selected.size + ' packets moved to recycle bin', 'orange');
+  setTimeout(() => window.location.reload(), 800);
+}
+function openSelectedPdfs() {
+  if (!selected.size) return;
+  document.getElementById('mo').style.display = 'flex';
+  document.getElementById('mo-title').textContent = selected.size + ' Selected Packets';
+  document.getElementById('mbody').innerHTML = 'Loading…';
+  Promise.all(Array.from(selected).map(mid =>
+    fetch('/meeting/'+mid).then(r=>r.json())
+  )).then(results => {
+    const all = results.flat();
+    document.getElementById('mbody').innerHTML = all.map(p => `
+      <div style="padding:10px;background:var(--surface2);border-radius:8px;margin-bottom:8px">
+        <div style="font-size:11px;font-weight:700;margin-bottom:6px">${esc(p.filename)}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <a href="/view/${p.id}" target="_blank" class="btn btn-primary btn-sm">👁 View</a>
+          <a href="/download/${p.id}" class="btn btn-secondary btn-sm">⬇</a>
+          <button class="btn btn-orange btn-sm" onclick="archivePkt(${p.id})">🗄</button>
+          <button class="btn btn-red btn-sm" onclick="confirmDelete(${p.id},'${esc(p.filename)}')">🗑</button>
+        </div>
+      </div>`).join('');
+  });
+}
+
+// ── Packet modal ──────────────────────────────────────────────────────────────
+async function showPackets(e, mid, archived=false) {
+  e.preventDefault();
+  document.getElementById('mo').style.display = 'flex';
+  document.getElementById('mo-title').textContent = 'Packets';
+  document.getElementById('mbody').innerHTML = 'Loading…';
+  const url = '/meeting/'+mid+(archived?'?archived=1':'');
+  const pkts = await fetch(url).then(r=>r.json());
+  if (!pkts.length) { document.getElementById('mbody').innerHTML='<p style="color:var(--muted)">No packets.</p>'; return; }
+  document.getElementById('mbody').innerHTML = pkts.map(p => {
+    const isArch = p.status === 'archived';
+    const newB   = isNew(p.downloaded_at) ? '<span style="background:var(--green);color:#000;font-size:9px;font-weight:800;padding:2px 6px;border-radius:8px;margin-left:6px">NEW</span>' : '';
+    const archB  = isArch ? '<span style="background:var(--orange);color:#000;font-size:9px;padding:2px 6px;border-radius:8px;margin-left:6px">ARCHIVED</span>' : '';
+    return `
+    <div style="padding:12px;background:var(--surface2);border-radius:8px;margin-bottom:10px;${isArch?'opacity:.7':''}">
+      <div style="font-size:12px;font-weight:700;margin-bottom:3px">${esc(p.filename)}${newB}${archB}</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${p.file_size_kb} KB · ${p.downloaded_at.slice(0,10)}</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <a href="/view/${p.id}" target="_blank" class="btn btn-primary btn-sm">👁 View PDF</a>
+        <a href="/download/${p.id}" class="btn btn-secondary btn-sm">⬇ Download</a>
+        ${isArch
+          ? `<button class="btn btn-orange btn-sm" onclick="unarchivePkt(${p.id})">↩ Unarchive</button>`
+          : `<button class="btn btn-secondary btn-sm" onclick="archivePkt(${p.id})">🗄 Archive</button>`}
+        <button class="btn btn-red btn-sm" onclick="confirmDelete(${p.id},'${esc(p.filename)}')">🗑 Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function isNew(dt) { return dt && (new Date() - new Date(dt)) < 48*60*60*1000; }
+function closeMo() { document.getElementById('mo').style.display='none'; }
+document.getElementById('mo').addEventListener('click', e => { if(e.target===document.getElementById('mo'))closeMo(); });
+
+// ── Archive/Unarchive ─────────────────────────────────────────────────────────
+async function archivePkt(pid) {
+  await fetch('/api/packet/'+pid+'/archive', {method:'POST'});
+  window.location.reload();
+}
+async function unarchivePkt(pid) {
+  await fetch('/api/packet/'+pid+'/unarchive', {method:'POST'});
+  window.location.reload();
+}
+async function quickArchive(e, mid) {
+  e.stopPropagation();
+  const card = document.getElementById('card-'+mid);
+  if (card) { card.style.opacity='0'; card.style.transition='.2s'; setTimeout(()=>card.remove(),200); }
+  const pkts = await fetch('/meeting/'+mid).then(r=>r.json());
+  for (const p of pkts) await fetch('/api/packet/'+p.id+'/archive', {method:'POST'});
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+function confirmDelete(pid, filename) {
+  pendingDeleteId = pid;
+  document.getElementById('confirm-msg').textContent = 'Move "'+filename+'" to recycle bin?';
+  document.getElementById('confirm-overlay').style.display = 'flex';
+  document.getElementById('confirm-ok-btn').onclick = async () => {
+    await fetch('/api/packet/'+pendingDeleteId+'/delete', {method:'POST'});
+    closeConfirm();
+    window.location.reload();
+  };
+}
+function closeConfirm() { document.getElementById('confirm-overlay').style.display='none'; }
+
+function showDeleteOptions() {
+  document.getElementById('delete-confirm-input').value = '';
+  document.getElementById('del-sel-count').textContent = selected.size;
+  document.getElementById('delete-options-overlay').style.display = 'flex';
+}
+function closeDeleteOptions() { document.getElementById('delete-options-overlay').style.display='none'; }
+
+async function deleteOldest() {
+  const n = parseInt(document.getElementById('delete-n-input').value)||10;
+  closeDeleteOptions();
+  showToast('Moving oldest '+n+' to recycle bin…','orange');
+  await fetch('/api/packets/delete-oldest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({count:n})});
+  showToast(n+' packets moved to recycle bin','green');
+  setTimeout(()=>window.location.reload(),1000);
+}
+
+async function executeDeleteAll() {
+  const input = document.getElementById('delete-confirm-input').value.trim();
+  if (input !== 'DELETE') { showToast('Type DELETE to confirm','red'); return; }
+  closeDeleteOptions();
+  showToast('Moving all packets to recycle bin…','orange');
+  await fetch('/api/packets/delete-all',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+  showToast('All packets moved to recycle bin','green');
+  setTimeout(()=>window.location.reload(),1000);
+}
+
+// ── Recycle ───────────────────────────────────────────────────────────────────
+async function restorePacket(rid) {
+  await fetch('/api/recycle/'+rid+'/restore',{method:'POST'});
+  showToast('Packet restored!','green');
+  setTimeout(()=>window.location.reload(),800);
+}
+async function emptyRecycle() {
+  if (!confirm('Permanently delete all recycle bin items? Cannot be undone.')) return;
+  await fetch('/api/recycle/empty',{method:'POST'});
+  showToast('Recycle bin emptied','orange');
+  setTimeout(()=>window.location.reload(),800);
+}
+
+// ── Sessions ──────────────────────────────────────────────────────────────────
+async function viewSession(sid) {
+  document.getElementById('mo').style.display='flex';
+  document.getElementById('mo-title').textContent = 'Session #'+sid;
+  document.getElementById('mbody').innerHTML='Loading…';
+  const pkts = await fetch('/api/session/'+sid+'/packets').then(r=>r.json());
+  if (!pkts.length) { document.getElementById('mbody').innerHTML='<p style="color:var(--muted)">No packets in this session.</p>'; return; }
+  document.getElementById('mbody').innerHTML =
+    '<p style="font-size:12px;color:var(--muted);margin-bottom:12px">'+pkts.length+' packets</p>' +
+    pkts.map(p=>`
+    <div style="padding:10px;background:var(--surface2);border-radius:8px;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:700">${esc(p.municipality)}, ${esc(p.state)}</div>
+      <div style="font-size:11px;color:var(--muted)">${esc(p.body_type.replace(/_/g,' '))} · ${esc(p.meeting_date)}</div>
+      <div style="display:flex;gap:5px;margin-top:8px">
+        <a href="/view/${p.id}" target="_blank" class="btn btn-primary btn-sm">👁</a>
+        <a href="/download/${p.id}" class="btn btn-secondary btn-sm">⬇</a>
+      </div>
+    </div>`).join('');
+}
+
+// ── Keywords ──────────────────────────────────────────────────────────────────
+async function addKeyword() {
+  const kw  = document.getElementById('new-kw-input').value.trim();
+  const cat = document.getElementById('new-kw-cat').value;
+  if (!kw) { showToast('Enter a keyword first','red'); return; }
+  const r = await fetch('/api/keywords/add',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({keyword:kw, category:cat})
+  });
+  const d = await r.json();
+  if (d.status === 'added') {
+    showToast('"'+kw+'" added!','green');
+    document.getElementById('new-kw-input').value='';
+    setTimeout(()=>window.location.reload(),800);
+  } else {
+    showToast('Keyword already exists','orange');
+  }
+}
+
+async function deleteKeyword(kid, el) {
+  await fetch('/api/keywords/'+kid+'/delete',{method:'POST'});
+  el.closest('.kw-tag').remove();
+  showToast('Keyword removed','orange');
+}
+
+// ── PDF search ────────────────────────────────────────────────────────────────
+function runPdfSearch() {
+  const q = document.getElementById('pdf-q').value.trim();
+  if (!q) return;
+  const url = new URL(window.location.href);
+  url.searchParams.set('pdf_q', q);
+  url.searchParams.set('tab','packets');
+  url.searchParams.set('page','1');
+  window.location.href = url.toString();
+}
+
+async function indexPdfs() {
+  showToast('Indexing PDFs in background…','blue');
+  await fetch('/api/index-pdfs',{method:'POST'});
+  showToast('PDF indexing started','green');
+}
+
+async function scoreAllPackets() {
+  showToast('Scoring packets for relevance…','blue');
+  await fetch('/api/score-packets',{method:'POST'});
+  showToast('Scoring started — refresh in a minute','green');
+}
+
+// ── Notes & Tags ──────────────────────────────────────────────────────────────
+let currentNoteMid = null;
+function showNoteTag(mid) {
+  currentNoteMid = mid;
+  document.getElementById('note-mid').value = mid;
+  document.getElementById('note-text').value = '';
+  document.querySelectorAll('#note-overlay .tag').forEach(t=>t.style.background='');
+  document.getElementById('note-overlay').style.display='flex';
+}
+function closeNoteTag() { document.getElementById('note-overlay').style.display='none'; }
+function toggleTagBtn(el, tag) {
+  el.style.background = el.style.background ? '' : 'var(--accent)';
+  el.style.color = el.style.color === '#000' ? '' : '#000';
+}
+async function saveNoteTag() {
+  const mid  = document.getElementById('note-mid').value;
+  const note = document.getElementById('note-text').value;
+  const tags = Array.from(document.querySelectorAll('#note-overlay .tag'))
+    .filter(t=>t.style.background).map(t=>t.textContent.trim());
+
+  // Get packets for this meeting
+  const pkts = await fetch('/meeting/'+mid).then(r=>r.json());
+  for (const p of pkts) {
+    if (note) await fetch('/api/packet/'+p.id+'/note',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({note})});
+    for (const tag of tags) await fetch('/api/packet/'+p.id+'/tag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tag})});
+  }
+  closeNoteTag();
+  showToast('Saved!','green');
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg, type='green') {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='show '+type;
+  clearTimeout(t._timer);
+  t._timer=setTimeout(()=>t.className='',3000);
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+poll();
+setInterval(poll, 4000);
+</script>
+</body>
+</html>

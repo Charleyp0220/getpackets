@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=GetPackets
+Comment=US Government Agenda Packet Scraper
+Exec=bash -c 'cd "$HOME/Downloads/getpackets" && source venv/bin/activate && python dashboard/app.py & sleep 3 && xdg-open http://localhost:8080'
+Icon=text-html
+Terminal=false
+Categories=Utility;Network;
+StartupNotify=true
