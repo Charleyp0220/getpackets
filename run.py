@@ -257,15 +257,19 @@ def scrape_state(state, total_packets, processed_legistar):
             color = Fore.GREEN if found > 0 else Fore.RED
             print(color + f"    {name:12s}: {found:3d} packets  ({elapsed:.1f}s)")
 
-    # Second sweep — Tier 1 only (catches inconsistent loads)
+    # ✅ FIXED: Second sweep
     if len(collected) < max_p:
         before2 = len(collected)
-        run_legistar(state, collected, max_p, processed)
-        if run_granicus:
-            run_granicus(state, collected, max_p)
+
+        # FIX 1: correct variable
+        run_legistar(state, collected, max_p, processed_legistar)
+
+        # FIX 2: actually call function (not just check it)
+        run_granicus(state, collected, max_p)
+
         swept = len(collected) - before2
         if swept > 0:
-            perf["Legistar(2)"] = swept
+            perf["SecondSweep"] = swept
             log_ok(f"  Second sweep: +{swept} more packets")
 
     return collected, perf
